@@ -46,13 +46,14 @@ class Question(models.Model):
     answers = models.ForeignKey(Answer, blank=True, null=True, verbose_name='Ответы', on_delete=models.CASCADE)
 
     def rating_change(self, user):
-        _, created = UserQuestion.objects.get_or_create(question_id=self.id, author_id=user.id)
+        obj, created = UserQuestion.objects.get_or_create(question_id=self.id, author_id=user.id)
         if created:
             self.author.rating += 1
             self.rating += 1
         else:
             self.author.rating -= 1
             self.rating -= 1
+            obj.delete()
 
     class Meta:
         verbose_name = 'Вопросы'
