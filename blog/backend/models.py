@@ -23,13 +23,13 @@ class Answer(models.Model):
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
 
     def rating_change(self, user):
-        _, had_like = UserAnswer.objects.get_or_create(answer_id=self.id, author_id=user.id)
-        if had_like:
-            self.rating -= 1
-            self.author.rating -= 1
-        else:
+        _, created = UserAnswer.objects.get_or_create(answer_id=self.id, author_id=user.id)
+        if created:
             self.rating += 1
             self.author.rating += 1
+        else:
+            self.rating -= 1
+            self.author.rating -= 1
 
     class Meta:
         verbose_name = 'Ответы'
@@ -43,16 +43,16 @@ class Question(models.Model):
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     tags = models.ManyToManyField(Tag, verbose_name='Теги')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
-    answers = models.ForeignKey(Answer, verbose_name='Ответы', on_delete=models.CASCADE)
+    answers = models.ForeignKey(Answer, blank=True, null=True, verbose_name='Ответы', on_delete=models.CASCADE)
 
     def rating_change(self, user):
-        _, had_like = UserQuestion.objects.get_or_create(question_id=self.id, author_id=user.id)
-        if had_like:
-            self.author.rating -= 1
-            self.rating -= 1
-        else:
+        _, created = UserQuestion.objects.get_or_create(question_id=self.id, author_id=user.id)
+        if created:
             self.author.rating += 1
             self.rating += 1
+        else:
+            self.author.rating -= 1
+            self.rating -= 1
 
     class Meta:
         verbose_name = 'Вопросы'
