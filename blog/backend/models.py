@@ -60,6 +60,12 @@ class Like(models.Model):
         return like
 
 
+class AnswerManager(models.Manager):
+    def create(self, *args, **kwargs):
+        obj = super().create(*args, **kwargs)
+        obj.question.count_up()
+
+
 class Answer(models.Model):
     text = models.TextField(verbose_name='Текст')
     author = models.OneToOneField(User, on_delete=models.CASCADE, related_name='answer', verbose_name='Автор')
@@ -67,6 +73,7 @@ class Answer(models.Model):
     right_answer = models.BooleanField(default=False, verbose_name='Верный ответ')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
     likes = GenericRelation(Like, related_name='likes')
+    objects = AnswerManager()
 
     def rating_up(self):
         Answer.objects.filter(id=self.id).update(rating=F('rating') + 1)
@@ -92,8 +99,9 @@ class Question(models.Model):
     long_text = models.TextField()
     author = models.OneToOneField(User, on_delete=models.CASCADE, related_name='question', verbose_name='Автор')
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
-    tags = models.ManyToManyField(Tag, verbose_name='Теги')
+    tags = models.ManyToManyField(Tag, verbose_name='Теги', related_name='questions')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
+    count_answers = models.PositiveIntegerField(default=0, verbose_name='Количество ответов')
     answers = models.ForeignKey(Answer, blank=True, null=True, related_name='question', verbose_name='Ответы', on_delete=models.CASCADE)
     likes = GenericRelation(Like, related_name='likes')
     objects = QuestionManager()
@@ -110,6 +118,9 @@ class Question(models.Model):
 
     def rating_down(self):
         Question.objects.filter(id=self.id).update(rating=F('rating') - 1)
+
+    def count_up(self):
+        Question.objects.filter(id=self.id).update(rating=F('count_answers') + 1)
 
     def add_tag(self, name):
         tag, is_created = Tag.objects.get_or_create(name=name)
