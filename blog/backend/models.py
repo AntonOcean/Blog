@@ -1,11 +1,11 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import F
 
 
-class UserManager(models.Manager):
+class UserCustomManager(UserManager):
     def top_users(self, key='rating', limit=10):
         return self.order_by(f'-{key}')[:limit]
 
@@ -13,7 +13,7 @@ class UserManager(models.Manager):
 class User(AbstractUser):
     avatar = models.ImageField(verbose_name='Аватарка')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
-    objects = UserManager()
+    objects = UserCustomManager()
 
     def rating_up(self):
         User.objects.filter(id=self.id).update(rating=F('rating') + 1)
@@ -66,7 +66,7 @@ class Answer(models.Model):
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     right_answer = models.BooleanField(default=False, verbose_name='Верный ответ')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
-    likes = GenericRelation(Like)
+    likes = GenericRelation(Like, related_name='likes')
 
     def rating_up(self):
         Answer.objects.filter(id=self.id).update(rating=F('rating') + 1)
@@ -89,14 +89,21 @@ class QuestionManager(models.Manager):
 
 class Question(models.Model):
     title = models.CharField(max_length=50, verbose_name='Название')
-    text = models.TextField()
+    long_text = models.TextField()
     author = models.OneToOneField(User, on_delete=models.CASCADE, related_name='question', verbose_name='Автор')
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     tags = models.ManyToManyField(Tag, verbose_name='Теги')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
-    answers = models.ForeignKey(Answer, blank=True, null=True, verbose_name='Ответы', on_delete=models.CASCADE)
-    likes = GenericRelation(Like)
+    answers = models.ForeignKey(Answer, blank=True, null=True, related_name='question', verbose_name='Ответы', on_delete=models.CASCADE)
+    likes = GenericRelation(Like, related_name='likes')
     objects = QuestionManager()
+
+    @property
+    def short_text(self):
+        current_text = self.long_text
+        if len(current_text) <= 100:
+            return current_text
+        return self.long_text[:100] + '...'
 
     def rating_up(self):
         Question.objects.filter(id=self.id).update(rating=F('rating') + 1)
