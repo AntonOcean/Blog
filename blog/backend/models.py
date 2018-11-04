@@ -6,13 +6,14 @@ from django.db.models import F
 
 
 class UserManager(models.Manager):
-    def top_ten_users(self):
-        return self.order_by('-rating')[:10]
+    def top_users(self, key='rating', limit=10):
+        return self.order_by(f'-{key}')[:limit]
 
 
 class User(AbstractUser):
     avatar = models.ImageField(verbose_name='Аватарка')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
+    objects = UserManager()
 
     def rating_up(self):
         User.objects.filter(id=self.id).update(rating=F('rating') + 1)
@@ -22,13 +23,14 @@ class User(AbstractUser):
 
 
 class TagManager(models.Manager):
-    def top_ten_tags(self):
-        return self.order_by('-rating')[:10]
+    def top_tags(self, key='rating', limit=10):
+        return self.order_by(f'-{key}')[:limit]
 
 
 class Tag(models.Model):
     name = models.CharField(max_length=20, unique=True, verbose_name='Название')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
+    objects = TagManager()
 
     def rating_up(self):
         Tag.objects.filter(id=self.id).update(rating=F('rating') + 1)
@@ -43,6 +45,20 @@ class Like(models.Model):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
 
+    @staticmethod
+    def set_like(obj, user):
+        obj_type = ContentType.objects.get_for_model(obj)
+        like, is_created = Like.objects.get_or_create(
+            content_type=obj_type, object_id=obj.id, user=user)
+        if is_created:
+            obj.author.rating_up()
+            obj.rating_up()
+        else:
+            obj.author.rating_down()
+            obj.rating_down()
+            like.delete()
+        return like
+
 
 class Answer(models.Model):
     text = models.TextField(verbose_name='Текст')
@@ -51,18 +67,6 @@ class Answer(models.Model):
     right_answer = models.BooleanField(default=False, verbose_name='Верный ответ')
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
     likes = GenericRelation(Like)
-
-    def set_like(self, user):
-        obj_type = ContentType.objects.get_for_model(Answer)
-        like, is_created = Like.objects.get_or_create(
-            content_type=obj_type, object_id=self.id, user=user)
-        if is_created:
-            self.author.rating_up()
-            self.rating_up()
-        else:
-            self.author.rating_down()
-            self.rating_down()
-            like.delete()
 
     def rating_up(self):
         Answer.objects.filter(id=self.id).update(rating=F('rating') + 1)
@@ -92,19 +96,7 @@ class Question(models.Model):
     rating = models.IntegerField(default=0, verbose_name='Рейтинг')
     answers = models.ForeignKey(Answer, blank=True, null=True, verbose_name='Ответы', on_delete=models.CASCADE)
     likes = GenericRelation(Like)
-    object = QuestionManager()
-
-    def set_like(self, user):
-        obj_type = ContentType.objects.get_for_model(Question)
-        like, is_created = Like.objects.get_or_create(
-            content_type=obj_type, object_id=self.id, user=user)
-        if is_created:
-            self.author.rating_up()
-            self.rating_up()
-        else:
-            self.author.rating_down()
-            self.rating_down()
-            like.delete()
+    objects = QuestionManager()
 
     def rating_up(self):
         Question.objects.filter(id=self.id).update(rating=F('rating') + 1)
@@ -117,6 +109,7 @@ class Question(models.Model):
         self.tags.add(tag)
         if not is_created:
             tag.rating_up()
+        return tag
 
     class Meta:
         verbose_name = 'Вопросы'
