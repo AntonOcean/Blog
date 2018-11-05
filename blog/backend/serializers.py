@@ -1,12 +1,8 @@
 from rest_framework import serializers
-from backend.models import User, Tag, Question, Answer, Like
+from backend.models import User, Tag, Question, Answer
 
 
 class QuestionSerializer(serializers.HyperlinkedModelSerializer):
-    likes = serializers.HyperlinkedIdentityField(
-        view_name='question-likes',
-        lookup_url_kwarg='question_pk'
-    )
     author = serializers.ReadOnlyField(source='author.username')
     answers = serializers.HyperlinkedIdentityField(
         many=True,
@@ -28,7 +24,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = User
-        fields = ('url', 'username', 'rating', 'avatar', 'email', 'login')
+        fields = ('url', 'username', 'rating', 'avatar', 'email')
 
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
@@ -45,19 +41,7 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
 
 class AnswerSerializer(serializers.HyperlinkedModelSerializer):
     author = serializers.ReadOnlyField(source='author.username')
-    likes = serializers.HyperlinkedIdentityField(
-        view_name='answer-likes',
-        lookup_url_kwarg='answer_pk'
-    )
 
     class Meta:
         model = Answer
-        fields = ('url', 'text', 'author', 'created', 'right_answer', 'rating')
-
-
-# class LikeSerializer(serializers.HyperlinkedModelSerializer):
-#     pass
-#
-#     class Meta:
-#         model = Like
-#         fields = '__all__'
+        fields = ('url', 'text', 'author', 'created', 'right_answer', 'rating', 'question')
