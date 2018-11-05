@@ -1,3 +1,5 @@
 from django.contrib import admin
 
-# Register your models here.
+from backend.models import Question, User, Tag, Answer
+
+admin.site.register((Question, User, Tag, Answer))
