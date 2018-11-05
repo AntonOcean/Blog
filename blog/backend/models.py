@@ -1,32 +1,53 @@
-from django.contrib.auth.models import AbstractUser, UserManager
+from django.contrib.auth.models import User, AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import F
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
-class UserCustomManager(UserManager):
+class ProfileManager(models.Manager):
     def top_users(self, key='rating', limit=10):
         return self.order_by(f'-{key}')[:limit]
 
 
-class User(AbstractUser):
-    avatar = models.ImageField(upload_to='media/%Y/%m/%d/', null=True, max_length=255, verbose_name='Аватарка')
+class Profile(models.Model):
+    user = models.OneToOneField(User, verbose_name='Профиль', related_name='profile', on_delete=models.CASCADE)
+    avatar = models.ImageField(upload_to='media/%Y/%m/%d/', blank=True, null=True, max_length=255, verbose_name='Аватарка')
     rating = models.IntegerField(default=0, auto_created=True, verbose_name='Рейтинг')
-    objects = UserCustomManager()
+    objects = ProfileManager()
 
     def rating_up(self):
-        User.objects.filter(id=self.id).update(rating=F('rating') + 1)
+        Profile.user.objects.filter(id=self.user.id).update(rating=F('rating') + 1)
 
     def rating_down(self):
-        User.objects.filter(id=self.id).update(rating=F('rating') - 1)
+        Profile.user.objects.filter(id=self.user.id).update(rating=F('rating') - 1)
+
+    def __str__(self):
+        return self.user.username
 
     class Meta:
-        verbose_name = 'Пользователь'
-        verbose_name_plural = 'Пользователи'
+        verbose_name = 'Профиль'
+        verbose_name_plural = 'Профиль'
+
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        Profile.objects.create(user=instance)
+
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    instance.profile.save()
 
 
 class TagManager(models.Manager):
+    def create(self, *args, **kwargs):
+        obj = super().get_or_create(*args, **kwargs)
+        return obj
+
     def top_tags(self, key='rating', limit=10):
         return self.order_by(f'-{key}')[:limit]
 
@@ -59,13 +80,14 @@ class Like(models.Model):
         like, is_created = Like.objects.get_or_create(
             content_type=obj_type, object_id=obj.id, user=user)
         if is_created:
-            obj.author.rating_up()
+            obj.author.profile.rating_up()
             obj.rating_up()
+            return obj.rating + 1
         else:
-            obj.author.rating_down()
+            obj.author.profile.rating_down()
             obj.rating_down()
             like.delete()
-        return like
+            return obj.rating - 1
 
 
 class QuestionManager(models.Manager):
@@ -81,7 +103,7 @@ class Question(models.Model):
     tags = models.ManyToManyField(Tag, verbose_name='Теги', related_name='questions')
     rating = models.IntegerField(default=0, auto_created=True, verbose_name='Рейтинг')
     count_answers = models.PositiveIntegerField(default=0, auto_created=True, verbose_name='Количество ответов')
-    likes = GenericRelation(Like, related_name='likes')
+    likes = GenericRelation(Like, blank=True, null=True, related_name='likes')
     objects = QuestionManager()
 
     @property
@@ -120,16 +142,17 @@ class AnswerManager(models.Manager):
     def create(self, *args, **kwargs):
         obj = super().create(*args, **kwargs)
         obj.question.count_up()
+        return obj
 
 
 class Answer(models.Model):
     text = models.TextField(verbose_name='Текст')
     author = models.OneToOneField(User, on_delete=models.CASCADE, related_name='answer', verbose_name='Автор')
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
-    right_answer = models.BooleanField(default=False, verbose_name='Верный ответ')
-    question = models.ForeignKey(Question, blank=True, null=True, related_name='answers', verbose_name='Вопрос', on_delete=models.CASCADE)
+    right_answer = models.BooleanField(default=False, auto_created=True, verbose_name='Верный ответ')
+    question = models.ForeignKey(Question, related_name='answers', verbose_name='Вопрос', on_delete=models.CASCADE)
     rating = models.IntegerField(default=0, auto_created=True, verbose_name='Рейтинг')
-    likes = GenericRelation(Like, related_name='likes')
+    likes = GenericRelation(Like, blank=True, null=True, related_name='likes')
     objects = AnswerManager()
 
     def rating_up(self):
@@ -139,7 +162,9 @@ class Answer(models.Model):
         Answer.objects.filter(id=self.id).update(rating=F('rating') - 1)
 
     def mark_as_right(self):
-        Answer.objects.filter(id=self.id).update(right_answer=True)
+        current_state = not self.right_answer
+        Answer.objects.filter(id=self.id).update(right_answer=current_state)
+        return current_state
 
     def __str__(self):
         return self.text
