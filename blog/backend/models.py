@@ -96,7 +96,7 @@ class QuestionManager(models.Manager):
 class Question(models.Model):
     title = models.CharField(max_length=50, verbose_name='Название')
     long_text = models.TextField(verbose_name='Текст')
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='question', verbose_name='Автор')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='questions', verbose_name='Автор')
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     tags = models.ManyToManyField(Tag, verbose_name='Теги', related_name='questions')
     rating = models.IntegerField(default=0, auto_created=True, verbose_name='Рейтинг')
@@ -142,7 +142,7 @@ class Question(models.Model):
 
 class Answer(models.Model):
     text = models.TextField(verbose_name='Текст')
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='answer', verbose_name='Автор')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='answers', verbose_name='Автор')
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     right_answer = models.BooleanField(default=False, auto_created=True, verbose_name='Верный ответ')
     question = models.ForeignKey(Question, related_name='answers', verbose_name='Вопрос', on_delete=models.CASCADE)

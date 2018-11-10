@@ -1,18 +1,19 @@
-from django.urls import reverse
 from knox.auth import TokenAuthentication
 from knox.models import AuthToken
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser, AllowAny
 from rest_framework import generics, viewsets, permissions
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.reverse import reverse as rest_reverse
 
 from backend.models import Question, User, Answer, Tag, Like, Profile
+from backend.permissions import IsQuestionOwner, IsOwner
 from backend.serializers import QuestionSerializer, UserSerializer, AnswerSerializer, TagSerializer, ProfileSerializer, \
     CreateUserSerializer, LoginUserSerializer
 
 
-# TODO права досупа, обработка методов
+# регистрация
+# добавить сортировки
 
 @api_view(['GET'])
 def api_root(request, format=None):
@@ -28,6 +29,7 @@ def api_root(request, format=None):
 
 class RegistrationAPI(generics.GenericAPIView):
     serializer_class = CreateUserSerializer
+    permission_classes = (AllowAny,)
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -42,6 +44,7 @@ class RegistrationAPI(generics.GenericAPIView):
 class UserAPI(generics.RetrieveAPIView):
     # permission_classes = [permissions.IsAuthenticated, ]
     serializer_class = UserSerializer
+    permission_classes = (IsAdminUser,)
 
     def get_object(self):
         return self.request.user
@@ -50,6 +53,7 @@ class UserAPI(generics.RetrieveAPIView):
 class LoginAPI(generics.GenericAPIView):
     authentication_classes = (TokenAuthentication,)
     serializer_class = LoginUserSerializer
+    permission_classes = (AllowAny,)
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -62,13 +66,14 @@ class LoginAPI(generics.GenericAPIView):
 
 
 class QuestionViewSet(viewsets.ModelViewSet):
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=(IsAuthenticated,))
     def set_like(self, *args, **kwargs):
         user = self.request.user
         question = self.get_object()
@@ -87,11 +92,13 @@ class QuestionViewSet(viewsets.ModelViewSet):
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     queryset = User.objects.all()
+    permission_classes = (IsAdminUser,)
 
 
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
     queryset = Profile.objects.all()
+    permission_classes = (IsOwner|IsAdminUser,)
 
     def get_queryset(self):
         user_id = self.kwargs.get('user_pk')
@@ -103,6 +110,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
 class AnswerViewSet(viewsets.ModelViewSet):
     queryset = Answer.objects.all()
     serializer_class = AnswerSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
 
     def perform_create(self, serializer):
         question_id = self.kwargs.get('question_pk')
@@ -114,14 +122,14 @@ class AnswerViewSet(viewsets.ModelViewSet):
         else:
             serializer.save()
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=(IsAuthenticated,))
     def set_like(self,  *args, **kwargs):
         user = self.request.user
         question = self.get_object()
         count_like = Like.set_like(question, user)
         return Response({'count_like': count_like})
 
-    @action(detail=True, methods=['put'])
+    @action(detail=True, methods=['post'], permission_classes=(IsQuestionOwner|IsAdminUser,))
     def mark_as_right(self,  *args, **kwargs):
         answer = self.get_object()
         mark = answer.mark_as_right()
@@ -138,6 +146,7 @@ class AnswerViewSet(viewsets.ModelViewSet):
 class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
 
     def add_question(self):
         tag_name = self.request.POST.get('name')
