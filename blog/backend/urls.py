@@ -17,13 +17,13 @@ router.register(r'profiles', views.ProfileViewSet)
 
 question_router = routers.NestedSimpleRouter(router, r'questions', lookup='question')
 question_router.register(r'answers', views.AnswerViewSet, base_name='question-answers')
-# question_router.register(r'tags', views.TagViewSet, base_name='question-tags')
+question_router.register(r'tags', views.TagViewSet, base_name='question-tags')
 
 tag_router = routers.NestedSimpleRouter(router, r'tags', lookup='tag')
 tag_router.register(r'questions', views.QuestionViewSet, base_name='tag-questions')
 
 user_router = routers.NestedSimpleRouter(router, r'users', lookup='user')
-user_router.register(r'profile', views.ProfileViewSet, base_name='user-profile')
+user_router.register(r'profiles', views.ProfileViewSet, base_name='user-profiles')
 
 
 urlpatterns = [
@@ -32,5 +32,5 @@ urlpatterns = [
     path('', include(question_router.urls)),
     path('', include(tag_router.urls)),
     path('', include(user_router.urls)),
-    path('auth/', drf_views.obtain_auth_token, name='auth')
+    # path('auth/', drf_views.obtain_auth_token, name='auth')
 ]
