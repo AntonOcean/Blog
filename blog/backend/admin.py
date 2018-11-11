@@ -30,7 +30,6 @@ class QuestionInline(admin.TabularInline):
 class ProfileAdmin(admin.ModelAdmin):
     list_display = ('user', )
     readonly_fields = ('rating', )
-#     add fields
 
 
 @admin.register(Tag)

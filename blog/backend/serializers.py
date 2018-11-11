@@ -51,6 +51,7 @@ class QuestionSerializer(serializers.HyperlinkedModelSerializer):
         many=True,
         queryset=Tag.objects.all(),
         slug_field='name',
+        required=False,
      )
 
     class Meta:

@@ -1,4 +1,4 @@
-from django.contrib.auth import login, user_logged_in
+from django.contrib.auth import login, user_logged_in, user_logged_out, logout
 from knox.auth import TokenAuthentication
 from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
@@ -6,7 +6,7 @@ from rest_framework.authentication import BasicAuthentication
 from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.decorators import permission_classes as permission
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser, AllowAny
-from rest_framework import generics, viewsets, permissions
+from rest_framework import generics, viewsets, permissions, status
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.reverse import reverse as rest_reverse
@@ -45,7 +45,7 @@ class RegistrationAPI(generics.CreateAPIView):
         return Response({
             "user": UserSerializer(user, context=self.get_serializer_context()).data,
             "token": AuthToken.objects.create(user)
-        })
+        }, status=status.HTTP_201_CREATED)
 
 
 class LoginView(KnoxLoginView):
@@ -60,8 +60,19 @@ class LoginView(KnoxLoginView):
         return super(LoginView, self).post(request, format=None)
 
 
+class LogoutView(APIView):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request, format=None):
+        request._auth.delete()
+        user_logged_out.send(sender=request.user.__class__,
+                             request=request, user=request.user)
+        logout(request) # DEBUG only
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+
 class QuestionViewSet(viewsets.ModelViewSet):
-    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticatedOrReadOnly,)
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer
@@ -74,9 +85,12 @@ class QuestionViewSet(viewsets.ModelViewSet):
         user = self.request.user
         question = self.get_object()
         count_like = Like.set_like(question, user)
-        user.save()
+        question.author.profile.save()
         question.save()
-        return Response({'rating': count_like})
+        return Response(
+            {'question': QuestionSerializer(question, context=self.get_serializer_context()).data},
+            status=status.HTTP_201_CREATED
+        )
 
     def get_queryset(self):
         sort_by = self.request.GET.get('sort')
@@ -128,11 +142,14 @@ class AnswerViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=(IsAuthenticated,))
     def set_like(self,  *args, **kwargs):
         user = self.request.user
-        question = self.get_object()
-        count_like = Like.set_like(question, user)
-        user.save()
-        question.save()
-        return Response({'count_like': count_like})
+        answer = self.get_object()
+        count_like = Like.set_like(answer, user)
+        answer.author.profile.save()
+        answer.save()
+        return Response(
+            {'answer': AnswerSerializer(answer, context=self.get_serializer_context()).data},
+            status=status.HTTP_201_CREATED
+        )
 
     @action(detail=True, methods=['post'], permission_classes=(IsQuestionOwner|IsAdminUser,))
     def mark_as_right(self,  *args, **kwargs):
