@@ -1,5 +1,6 @@
 from knox.auth import TokenAuthentication
 from knox.models import AuthToken
+from rest_framework.decorators import permission_classes as permission
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser, AllowAny
 from rest_framework import generics, viewsets, permissions
 from rest_framework.decorators import action, api_view
@@ -7,13 +8,12 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse as rest_reverse
 
 from backend.models import Question, User, Answer, Tag, Like, Profile
-from backend.permissions import IsQuestionOwner, IsOwner
+from backend.permissions import IsQuestionOwner, IsProfileOwner
 from backend.serializers import QuestionSerializer, UserSerializer, AnswerSerializer, TagSerializer, ProfileSerializer, \
-    CreateUserSerializer, LoginUserSerializer
+    LoginUserSerializer, CreateUserSerializer
 
 
 # регистрация
-# добавить сортировки
 
 @api_view(['GET'])
 def api_root(request, format=None):
@@ -22,27 +22,20 @@ def api_root(request, format=None):
         'questions': rest_reverse('question-list', request=request, format=format),
         'tags': rest_reverse('tag-list', request=request, format=format),
         'answers': rest_reverse('answer-list', request=request, format=format),
+        'profiles': rest_reverse('profile-list', request=request, format=format),
         'register': rest_reverse('register', request=request, format=format),
-        'login': rest_reverse('login', request=request, format=format)
+        'login': rest_reverse('login', request=request, format=format),
+        'logout': rest_reverse('logout', request=request, format=format)
     })
 
 
-class RegistrationAPI(generics.GenericAPIView):
+class RegistrationAPI(generics.CreateAPIView):
     serializer_class = CreateUserSerializer
     permission_classes = (AllowAny,)
-
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        return Response({
-            "user": UserSerializer(user, context=self.get_serializer_context()).data,
-            # "token": AuthToken.objects.create(user)
-        })
+    queryset = User.objects.all()
 
 
 class UserAPI(generics.RetrieveAPIView):
-    # permission_classes = [permissions.IsAuthenticated, ]
     serializer_class = UserSerializer
     permission_classes = (IsAdminUser,)
 
@@ -83,6 +76,9 @@ class QuestionViewSet(viewsets.ModelViewSet):
         return Response({'rating': count_like})
 
     def get_queryset(self):
+        sort_by = self.request.GET.get('sort')
+        if sort_by:
+            return Question.objects.hot_questions(sort_by)
         tag_pk = self.kwargs.get('tag_pk')
         if tag_pk:
             return Question.objects.filter(tags__id=tag_pk)
@@ -98,10 +94,14 @@ class UserViewSet(viewsets.ModelViewSet):
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
     queryset = Profile.objects.all()
-    permission_classes = (IsOwner|IsAdminUser,)
+    permission_classes = (IsProfileOwner|IsAdminUser,)
 
     def get_queryset(self):
         user_id = self.kwargs.get('user_pk')
+        sort_by = self.request.GET.get('sort')
+        limit = self.request.GET.get('limit')
+        if sort_by and limit:
+            return Profile.objects.top_users(sort_by, int(limit))
         if user_id:
             return Profile.objects.filter(user_id=user_id)
         return Profile.objects.all()
@@ -127,6 +127,8 @@ class AnswerViewSet(viewsets.ModelViewSet):
         user = self.request.user
         question = self.get_object()
         count_like = Like.set_like(question, user)
+        user.save()
+        question.save()
         return Response({'count_like': count_like})
 
     @action(detail=True, methods=['post'], permission_classes=(IsQuestionOwner|IsAdminUser,))
@@ -164,6 +166,10 @@ class TagViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         question_pk = self.kwargs.get('question_pk')
+        sort_by = self.request.GET.get('sort')
+        limit = self.request.GET.get('limit')
+        if sort_by and limit:
+            return Tag.objects.top_tags(sort_by, int(limit))
         if question_pk:
             return Tag.objects.filter(questions__id=question_pk)
         return Tag.objects.all()

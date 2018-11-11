@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import permissions
 
-from backend.models import Question
+from backend.models import Question, Profile
 
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
@@ -21,7 +21,13 @@ class IsQuestionOwner(permissions.BasePermission):
         return False
 
 
-class IsOwner(permissions.BasePermission):
+class IsProfileOwner(permissions.BasePermission):
+
+    def has_permission(self, request, view):
+        if request.user and request.user.is_authenticated and view.kwargs.get('pk'):
+            profile = Profile.objects.get(id=view.kwargs.get('pk'))
+            return profile.user.id == request.user.id
+        return False
 
     def has_object_permission(self, request, view, obj):
         return obj.user == request.user

@@ -2,7 +2,6 @@ from django.contrib.auth.models import User, AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models import F
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -19,11 +18,9 @@ class Profile(models.Model):
     objects = ProfileManager()
 
     def rating_up(self):
-        # Profile.objects.filter(user__id = self.user.id).update(rating=F('rating') + 1)
         self.rating += 1
 
     def rating_down(self):
-        # Profile.objects.filter(user__id=self.user.id).update(rating=F('rating') - 1)
         self.rating -= 1
 
     def __str__(self):
@@ -56,7 +53,6 @@ class Tag(models.Model):
     objects = TagManager()
 
     def rating_up(self):
-        # Tag.objects.filter(id=self.id).update(rating=F('rating') + 1)
         self.rating += 1
 
     def __str__(self):
@@ -89,8 +85,8 @@ class Like(models.Model):
 
 
 class QuestionManager(models.Manager):
-    def hot_questions(self):
-        return self.order_by('-rating')
+    def hot_questions(self, sort_by='rating'):
+        return self.order_by(f'-{sort_by}')
 
 
 class Question(models.Model):
@@ -112,15 +108,12 @@ class Question(models.Model):
         return self.long_text[:100] + '...'
 
     def rating_up(self):
-        # Question.objects.filter(id=self.id).update(rating=F('rating') + 1)
         self.rating += 1
 
     def rating_down(self):
-        # Question.objects.filter(id=self.id).update(rating=F('rating') - 1)
         self.rating -= 1
 
     def count_up(self):
-        # Question.objects.filter(id=self.id).update(rating=F('count_answers') + 1)
         self.count_answers += 1
 
     def add_tag(self, name):
@@ -150,16 +143,13 @@ class Answer(models.Model):
     likes = GenericRelation(Like, blank=True, null=True, related_name='likes')
 
     def rating_up(self):
-        # Answer.objects.filter(id=self.id).update(rating=F('rating') + 1)
         self.rating += 1
 
     def rating_down(self):
-        # Answer.objects.filter(id=self.id).update(rating=F('rating') - 1)
         self.rating -= 1
 
     def mark_as_right(self):
         self.right_answer = not self.right_answer
-        # Answer.objects.filter(id=self.id).update(right_answer=current_state)
         return self.right_answer
 
     def __str__(self):

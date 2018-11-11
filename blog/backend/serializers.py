@@ -7,16 +7,23 @@ from backend.models import Tag, Question, Answer, Profile
 
 
 class CreateUserSerializer(serializers.ModelSerializer):
+    avatar = serializers.ImageField(source='profile.avatar', required=False)
+    profile = NestedHyperlinkedRelatedField(
+        read_only=True,
+        view_name='user-profiles-detail',
+        # view_name='domain-nameservers-detail'
+        parent_lookup_kwargs={'user_pk': 'user__pk'}
+    )
+    # def create(self, validated_data):
+    #     user = User.objects.create_user(validated_data['username'],
+    #                                     None,
+    #                                     validated_data['password'])
+    #     return user
+
     class Meta:
         model = User
-        fields = ('id', 'username', 'password')
+        fields = ('username', 'profile', 'email', 'password', 'avatar')
         extra_kwargs = {'password': {'write_only': True}}
-
-    def create(self, validated_data):
-        user = User.objects.create_user(validated_data['username'],
-                                        None,
-                                        validated_data['password'])
-        return user
 
 
 class LoginUserSerializer(serializers.Serializer):
@@ -75,6 +82,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = User
         fields = ('url', 'username', 'profile', 'email', 'password', 'avatar')
+        extra_kwargs = {'password': {'write_only': True}}
 
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
