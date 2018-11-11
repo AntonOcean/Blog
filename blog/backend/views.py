@@ -1,19 +1,22 @@
+from django.contrib.auth import login, user_logged_in
 from knox.auth import TokenAuthentication
 from knox.models import AuthToken
+from knox.views import LoginView as KnoxLoginView
+from rest_framework.authentication import BasicAuthentication
+from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.decorators import permission_classes as permission
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser, AllowAny
 from rest_framework import generics, viewsets, permissions
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.reverse import reverse as rest_reverse
+from rest_framework.views import APIView
 
 from backend.models import Question, User, Answer, Tag, Like, Profile
 from backend.permissions import IsQuestionOwner, IsProfileOwner
 from backend.serializers import QuestionSerializer, UserSerializer, AnswerSerializer, TagSerializer, ProfileSerializer, \
     LoginUserSerializer, CreateUserSerializer
 
-
-# регистрация
 
 @api_view(['GET'])
 def api_root(request, format=None):
@@ -25,7 +28,8 @@ def api_root(request, format=None):
         'profiles': rest_reverse('profile-list', request=request, format=format),
         'register': rest_reverse('register', request=request, format=format),
         'login': rest_reverse('login', request=request, format=format),
-        'logout': rest_reverse('logout', request=request, format=format)
+        'logout': rest_reverse('logout', request=request, format=format),
+        'debug_logout': rest_reverse('debug_logout', request=request, format=format),
     })
 
 
@@ -34,31 +38,30 @@ class RegistrationAPI(generics.CreateAPIView):
     permission_classes = (AllowAny,)
     queryset = User.objects.all()
 
-
-class UserAPI(generics.RetrieveAPIView):
-    serializer_class = UserSerializer
-    permission_classes = (IsAdminUser,)
-
-    def get_object(self):
-        return self.request.user
-
-
-class LoginAPI(generics.GenericAPIView):
-    authentication_classes = (TokenAuthentication,)
-    serializer_class = LoginUserSerializer
-    permission_classes = (AllowAny,)
-
-    def post(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data
+        user = serializer.save()
         return Response({
             "user": UserSerializer(user, context=self.get_serializer_context()).data,
-            # "token": AuthToken.objects.create(user)
+            "token": AuthToken.objects.create(user)
         })
 
 
+class LoginView(KnoxLoginView):
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = LoginUserSerializer # DEBUG only
+
+    def post(self, request, format=None):
+        serializer = AuthTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        login(request, user)
+        return super(LoginView, self).post(request, format=None)
+
+
 class QuestionViewSet(viewsets.ModelViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticatedOrReadOnly,)
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer

@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate
 from rest_framework import serializers, validators
 from django.contrib.auth.models import User
 from rest_framework_nested.relations import NestedHyperlinkedRelatedField
+# from knox.serializers import UserSerializer
 
 from backend.models import Tag, Question, Answer, Profile
 
@@ -11,14 +12,14 @@ class CreateUserSerializer(serializers.ModelSerializer):
     profile = NestedHyperlinkedRelatedField(
         read_only=True,
         view_name='user-profiles-detail',
-        # view_name='domain-nameservers-detail'
         parent_lookup_kwargs={'user_pk': 'user__pk'}
     )
-    # def create(self, validated_data):
-    #     user = User.objects.create_user(validated_data['username'],
-    #                                     None,
-    #                                     validated_data['password'])
-    #     return user
+
+    def create(self, validated_data):
+        user = User.objects.create_user(validated_data['username'],
+                                        validated_data.get('email'),
+                                        validated_data['password'])
+        return user
 
     class Meta:
         model = User
@@ -26,7 +27,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
 
-class LoginUserSerializer(serializers.Serializer):
+class LoginUserSerializer(serializers.Serializer): # DEBUG feature
     username = serializers.CharField()
     password = serializers.CharField()
 
@@ -34,11 +35,7 @@ class LoginUserSerializer(serializers.Serializer):
         user = authenticate(**data)
         if user and user.is_active:
             return user
-        raise serializers.ValidationError("Unable to log in with provided credentials.")
-    #
-    # class Meta:
-    #     model = User
-    #     fields = ('username', 'password')
+        raise serializers.ValidationError("Неверные логин или пароль.")
 
 
 class QuestionSerializer(serializers.HyperlinkedModelSerializer):
@@ -54,16 +51,7 @@ class QuestionSerializer(serializers.HyperlinkedModelSerializer):
         many=True,
         queryset=Tag.objects.all(),
         slug_field='name',
-        # read_only=True
      )
-    # tags = serializers.HyperlinkedIdentityField(
-    #     view_name='question-tags-list',
-    #     lookup_url_kwarg='question_pk',
-    #     read_only=True
-    # )
-    # tags_field = serializers.CharField(max_length=200)
-
-    # def ta
 
     class Meta:
         model = Question
@@ -75,7 +63,6 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     profile = NestedHyperlinkedRelatedField(
         read_only=True,
         view_name='user-profiles-detail',
-        # view_name='domain-nameservers-detail'
         parent_lookup_kwargs={'user_pk': 'user__pk'}
     )
 
