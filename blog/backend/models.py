@@ -2,7 +2,7 @@ from django.contrib.auth.models import User, AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 
@@ -116,14 +116,6 @@ class Question(models.Model):
     def count_up(self):
         self.count_answers += 1
 
-    def add_tag(self, name):
-        tag, is_created = Tag.objects.get_or_create(name=name)
-        self.tags.add(tag)
-        if not is_created:
-            tag.rating_up()
-            tag.save()
-        return tag
-
     def __str__(self):
         return self.title
 
@@ -131,6 +123,11 @@ class Question(models.Model):
         verbose_name = 'Вопрос'
         verbose_name_plural = 'Вопросы'
         ordering = ['-created']
+
+
+# @receiver(pre_save, sender=Question)
+# def my_handler(sender, **kwargs):
+    # print(sender, kwargs)
 
 
 class Answer(models.Model):

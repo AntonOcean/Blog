@@ -80,6 +80,20 @@ class QuestionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        tags = serializer.initial_data.get('tags', [])
+        for name_tag in tags:
+            tag, _ = Tag.objects.get_or_create(name=name_tag)
+            tag.rating_up()
+            tag.save()
+
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
     @action(detail=True, methods=['post'], permission_classes=(IsAuthenticated,))
     def set_like(self, *args, **kwargs):
         user = self.request.user
@@ -88,7 +102,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         question.author.profile.save()
         question.save()
         return Response(
-            {'question': QuestionSerializer(question, context=self.get_serializer_context()).data},
+            QuestionSerializer(question, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED
         )
 
@@ -147,7 +161,7 @@ class AnswerViewSet(viewsets.ModelViewSet):
         answer.author.profile.save()
         answer.save()
         return Response(
-            {'answer': AnswerSerializer(answer, context=self.get_serializer_context()).data},
+            AnswerSerializer(answer, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED
         )
 
@@ -156,7 +170,10 @@ class AnswerViewSet(viewsets.ModelViewSet):
         answer = self.get_object()
         mark = answer.mark_as_right()
         answer.save()
-        return Response({'is_right': mark})
+        return Response(
+            AnswerSerializer(answer, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED
+        )
 
     def get_queryset(self):
         question_id = self.kwargs.get('question_pk')
@@ -169,20 +186,6 @@ class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-
-    def add_question(self):
-        tag_name = self.request.POST.get('name')
-        tag = Tag.objects.get(name=tag_name)
-        question_id = self.kwargs.get('question_pk')
-        question = Question.objects.get(id=question_id)
-        tag.questions.add(question)
-        tag.rating_up()
-        tag.save()
-
-    def create(self, request, *args, **kwargs):
-        response = super().create(request, *args)
-        self.add_question()
-        return response
 
     def get_queryset(self):
         question_pk = self.kwargs.get('question_pk')

@@ -81,16 +81,9 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
     )
     rating = serializers.IntegerField(read_only=True)
 
-    def create(self, validated_data):
-        instance, _ = Tag.objects.get_or_create(**validated_data)
-        return instance
-
     class Meta:
         model = Tag
         fields = ('url', 'name', 'rating', 'questions')
-        extra_kwargs = {
-            'name': {'validators': []},
-        }
 
 
 class AnswerSerializer(serializers.HyperlinkedModelSerializer):
