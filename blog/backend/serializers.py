@@ -1,8 +1,5 @@
 from django.contrib.auth import authenticate
-from rest_framework import serializers, validators
-# from django.contrib.auth.models import User
-from rest_framework_nested.relations import NestedHyperlinkedRelatedField
-# from knox.serializers import UserSerializer
+from rest_framework import serializers
 
 from backend.models import Tag, Question, Answer, User
 

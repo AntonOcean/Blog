@@ -1,5 +1,4 @@
 from django.contrib.auth import login, user_logged_out, logout
-from django.db.models import Prefetch
 from knox.auth import TokenAuthentication
 from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
@@ -51,7 +50,7 @@ class RegistrationAPI(generics.CreateAPIView):
 
 class LoginView(KnoxLoginView):
     permission_classes = (permissions.AllowAny,)
-    serializer_class = LoginUserSerializer # DEBUG only
+    serializer_class = LoginUserSerializer  # DEBUG only
 
     def post(self, request, format=None):
         serializer = AuthTokenSerializer(data=request.data)
