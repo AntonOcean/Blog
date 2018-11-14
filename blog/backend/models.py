@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser, UserManager
+from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -6,10 +6,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 
-
-class BlogUserManager(UserManager):
-    def top_users(self, key='rating', limit=10):
-        return self.order_by(f'-{key}')[:limit]
+from backend.managers import BlogUserManager, TagManager, QuestionManager
 
 
 class User(AbstractUser):
@@ -36,11 +33,6 @@ class User(AbstractUser):
 # @receiver(post_save, sender=User)
 # def save_user_profile(sender, instance, **kwargs):
 #     instance.profile.save()
-
-
-class TagManager(models.Manager):
-    def top_tags(self, key='rating', limit=10):
-        return self.order_by(f'-{key}')[:limit]
 
 
 class Tag(models.Model):
@@ -78,11 +70,6 @@ class Like(models.Model):
             obj.rating_down()
             like.delete()
         return obj.rating
-
-
-class QuestionManager(models.Manager):
-    def hot_questions(self, sort_by='rating'):
-        return self.order_by(f'-{sort_by}')
 
 
 class Question(models.Model):
