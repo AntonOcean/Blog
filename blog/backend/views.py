@@ -1,8 +1,10 @@
 from django.contrib.auth import login, user_logged_out, logout
+from django.db.models import Prefetch
 from knox.auth import TokenAuthentication
 from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
 from rest_framework.authtoken.serializers import AuthTokenSerializer
+from rest_framework.pagination import CursorPagination
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser, AllowAny
 from rest_framework import generics, viewsets, permissions, status, mixins
 from rest_framework.decorators import action, api_view
@@ -73,8 +75,10 @@ class LogoutView(APIView):
 
 class QuestionViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly,)
-    queryset = Question.objects.all()
+    queryset = Question.objects.prefetch_related('tags', 'author')
     serializer_class = QuestionSerializer
+    pagination_class = CursorPagination
+
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)

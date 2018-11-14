@@ -446,8 +446,8 @@ class TestTag(BaseViewTest):
             {},
             content_type="application/json"
         )
-        self.assertEqual(2, len(response.data))
-        self.assertEqual(1, response.data[0]['rating'])
+        self.assertEqual(2, len(response.data['results']))
+        self.assertEqual(1, response.data['results'][0]['rating'])
 
         url = reverse('question-list')
         response = self.client.post(
@@ -468,8 +468,8 @@ class TestTag(BaseViewTest):
             {},
             content_type="application/json"
         )
-        self.assertEqual(2, len(response.data))
-        self.assertEqual(2, response.data[0]['rating'])
+        self.assertEqual(2, len(response.data['results']))
+        self.assertEqual(2, response.data['results'][0]['rating'])
 
 
 class TestProfile(BaseViewTest):
