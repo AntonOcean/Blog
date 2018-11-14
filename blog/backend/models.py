@@ -108,11 +108,6 @@ class Question(models.Model):
         ordering = ['-created']
 
 
-# @receiver(pre_save, sender=Question)
-# def my_handler(sender, **kwargs):
-    # print(sender, kwargs)
-
-
 class Answer(models.Model):
     text = models.TextField(verbose_name='Текст')
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='answers', verbose_name='Автор')

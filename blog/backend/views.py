@@ -115,7 +115,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         tag_pk = self.kwargs.get('tag_pk')
         if tag_pk:
             return Question.objects.filter(tags__id=tag_pk)
-        return Question.objects.all()
+        return super().get_queryset()
 
 
 class UserListView(generics.ListAPIView):
