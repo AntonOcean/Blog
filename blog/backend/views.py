@@ -1,17 +1,14 @@
-from django.contrib.auth import login, user_logged_in, user_logged_out, logout
+from django.contrib.auth import login, user_logged_out, logout
 from knox.auth import TokenAuthentication
 from knox.models import AuthToken
 from knox.views import LoginView as KnoxLoginView
-from rest_framework.authentication import BasicAuthentication
 from rest_framework.authtoken.serializers import AuthTokenSerializer
-from rest_framework.decorators import permission_classes as permission
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser, AllowAny
 from rest_framework import generics, viewsets, permissions, status, mixins
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet
 
 from backend.models import Question, User, Answer, Tag, Like
 from backend.permissions import IsQuestionOwner, IsUserOwner
@@ -87,9 +84,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
 
         tags = serializer.initial_data.get('tags', [])
         for name_tag in tags:
-            tag, _ = Tag.objects.get_or_create(name=name_tag)
-            tag.rating_up()
-            tag.save()
+            Tag.objects.get_or_create(name=name_tag)
 
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -100,11 +95,9 @@ class QuestionViewSet(viewsets.ModelViewSet):
     def set_like(self, *args, **kwargs):
         user = self.request.user
         question = self.get_object()
-        count_like = Like.set_like(question, user)
-        question.author.save()
-        question.save()
+        Like.set_like(question, user)
         return Response(
-            QuestionSerializer(question, context=self.get_serializer_context()).data,
+            QuestionSerializer(self.get_object(), context=self.get_serializer_context()).data,
             status=status.HTTP_200_OK
         )
 
@@ -144,23 +137,15 @@ class AnswerViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         question_id = self.kwargs.get('question_pk')
-        if question_id:
-            serializer.save(author=self.request.user, question_id=question_id)
-            question = Question.objects.get(id=question_id)
-            question.count_up()
-            question.save()
-        else:
-            serializer.save()
+        serializer.save(author=self.request.user, question_id=question_id)
 
     @action(detail=True, methods=['put'], permission_classes=(IsAuthenticated,))
     def set_like(self,  *args, **kwargs):
         user = self.request.user
         answer = self.get_object()
-        count_like = Like.set_like(answer, user)
-        answer.author.save()
-        answer.save()
+        Like.set_like(answer, user)
         return Response(
-            AnswerSerializer(answer, context=self.get_serializer_context()).data,
+            AnswerSerializer(self.get_object(), context=self.get_serializer_context()).data,
             status=status.HTTP_200_OK
         )
 
@@ -187,11 +172,8 @@ class TagViewSet(viewsets.GenericViewSet, mixins.ListModelMixin, mixins.Retrieve
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
     def get_queryset(self):
-        # question_pk = self.kwargs.get('question_pk')
         sort_by = self.request.GET.get('sort')
         limit = self.request.GET.get('limit')
         if sort_by and limit:
             return Tag.objects.top_tags(sort_by, int(limit))
-        # if question_pk:
-        #     return Tag.objects.filter(questions__id=question_pk)
         return Tag.objects.all()

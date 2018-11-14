@@ -297,7 +297,7 @@ class TestAnswer(BaseViewTest):
             content_type="application/json"
         )
 
-        self.assertEqual(response.data['count_answers'], 0)
+        self.assertEqual(response.data['count_answers'], 1)
 
         token = self.login_client(self.bob_username, self.bob_password)
         response = self.create_answer()
@@ -311,7 +311,7 @@ class TestAnswer(BaseViewTest):
             content_type="application/json"
         )
 
-        self.assertEqual(response.data['count_answers'], 1)
+        self.assertEqual(response.data['count_answers'], 2)
 
     def test_answer_set_like(self):
         """

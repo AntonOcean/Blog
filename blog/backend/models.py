@@ -2,9 +2,9 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models.signals import post_save, pre_save
+from django.db.models import F
+from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.dispatch import receiver
-from django.urls import reverse
 
 from backend.managers import BlogUserManager, TagManager, QuestionManager
 
@@ -14,34 +14,14 @@ class User(AbstractUser):
     rating = models.IntegerField(default=0, auto_created=True, verbose_name='Рейтинг')
     objects = BlogUserManager()
 
-    def rating_up(self):
-        self.rating += 1
-
-    def rating_down(self):
-        self.rating -= 1
-
     def __str__(self):
         return self.username
-
-
-# @receiver(post_save, sender=User)
-# def create_user_profile(sender, instance, created, **kwargs):
-#     if created:
-#         Profile.objects.create(user=instance)
-#
-#
-# @receiver(post_save, sender=User)
-# def save_user_profile(sender, instance, **kwargs):
-#     instance.profile.save()
 
 
 class Tag(models.Model):
     name = models.CharField(max_length=20, unique=True, verbose_name='Название')
     rating = models.IntegerField(default=0, auto_created=True, verbose_name='Рейтинг')
     objects = TagManager()
-
-    def rating_up(self):
-        self.rating += 1
 
     def __str__(self):
         return self.name
@@ -62,14 +42,8 @@ class Like(models.Model):
         obj_type = ContentType.objects.get_for_model(obj)
         like, is_created = Like.objects.get_or_create(
             content_type=obj_type, object_id=obj.id, user=user)
-        if is_created:
-            obj.author.rating_up()
-            obj.rating_up()
-        else:
-            obj.author.rating_down()
-            obj.rating_down()
+        if not is_created:
             like.delete()
-        return obj.rating
 
 
 class Question(models.Model):
@@ -90,15 +64,6 @@ class Question(models.Model):
             return current_text
         return self.long_text[:100] + '...'
 
-    def rating_up(self):
-        self.rating += 1
-
-    def rating_down(self):
-        self.rating -= 1
-
-    def count_up(self):
-        self.count_answers += 1
-
     def __str__(self):
         return self.title
 
@@ -117,12 +82,6 @@ class Answer(models.Model):
     rating = models.IntegerField(default=0, auto_created=True, verbose_name='Рейтинг')
     likes = GenericRelation(Like, blank=True, null=True, related_name='likes')
 
-    def rating_up(self):
-        self.rating += 1
-
-    def rating_down(self):
-        self.rating -= 1
-
     def mark_as_right(self):
         self.right_answer = not self.right_answer
         return self.right_answer
@@ -134,3 +93,34 @@ class Answer(models.Model):
         verbose_name = 'Ответ'
         verbose_name_plural = 'Ответы'
         ordering = ['-rating', 'created']
+
+
+@receiver(post_save, sender=Answer)
+def up_answer_count(sender, instance, created, **kwargs):
+    if created:
+        instance.question.count_answers += 1
+        instance.question.save()
+
+
+@receiver(post_save, sender=Like)
+def up_rating(sender, instance, created, **kwargs):
+    obj = instance.content_object
+    obj.rating += 1
+    obj.author.rating += 1
+    obj.author.save()
+    obj.save()
+
+
+@receiver(post_delete, sender=Like)
+def down_rating(sender, instance, **kwargs):
+    obj = instance.content_object
+    obj.rating -= 1
+    obj.author.rating -= 1
+    obj.author.save()
+    obj.save()
+
+
+@receiver(m2m_changed, sender=Question.tags.through)
+def up_tag_rating(sender, instance, model, pk_set, action, **kwargs):
+    if action == "post_add":
+        model.objects.filter(id__in=pk_set).update(rating=F('rating')+1)
