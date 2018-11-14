@@ -1,21 +1,21 @@
-from django.contrib.auth.models import User, AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.urls import reverse
 
 
-class ProfileManager(models.Manager):
+class BlogUserManager(UserManager):
     def top_users(self, key='rating', limit=10):
         return self.order_by(f'-{key}')[:limit]
 
 
-class Profile(models.Model):
-    user = models.OneToOneField(User, verbose_name='Профиль', related_name='profile', on_delete=models.CASCADE)
+class User(AbstractUser):
     avatar = models.ImageField(upload_to='media/%Y/%m/%d/', blank=True, null=True, max_length=255, verbose_name='Аватарка')
     rating = models.IntegerField(default=0, auto_created=True, verbose_name='Рейтинг')
-    objects = ProfileManager()
+    objects = BlogUserManager()
 
     def rating_up(self):
         self.rating += 1
@@ -24,22 +24,18 @@ class Profile(models.Model):
         self.rating -= 1
 
     def __str__(self):
-        return self.user.username
-
-    class Meta:
-        verbose_name = 'Профиль'
-        verbose_name_plural = 'Профиль'
+        return self.username
 
 
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
-
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    instance.profile.save()
+# @receiver(post_save, sender=User)
+# def create_user_profile(sender, instance, created, **kwargs):
+#     if created:
+#         Profile.objects.create(user=instance)
+#
+#
+# @receiver(post_save, sender=User)
+# def save_user_profile(sender, instance, **kwargs):
+#     instance.profile.save()
 
 
 class TagManager(models.Manager):
@@ -75,10 +71,10 @@ class Like(models.Model):
         like, is_created = Like.objects.get_or_create(
             content_type=obj_type, object_id=obj.id, user=user)
         if is_created:
-            obj.author.profile.rating_up()
+            obj.author.rating_up()
             obj.rating_up()
         else:
-            obj.author.profile.rating_down()
+            obj.author.rating_down()
             obj.rating_down()
             like.delete()
         return obj.rating
@@ -156,4 +152,3 @@ class Answer(models.Model):
         verbose_name = 'Ответ'
         verbose_name_plural = 'Ответы'
         ordering = ['-rating', 'created']
-        default_manager_name = 'objects'

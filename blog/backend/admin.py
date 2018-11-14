@@ -1,6 +1,11 @@
 from django.contrib import admin
 
-from backend.models import Question, Tag, Answer, Profile
+from backend.models import Question, Tag, Answer, User
+
+
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    pass
 
 
 @admin.register(Answer)
@@ -24,12 +29,6 @@ class QuestionAdmin(admin.ModelAdmin):
 
 class QuestionInline(admin.TabularInline):
     model = Question.tags.through
-
-
-@admin.register(Profile)
-class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', )
-    readonly_fields = ('rating', )
 
 
 @admin.register(Tag)

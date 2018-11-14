@@ -6,31 +6,33 @@ from rest_framework.authentication import BasicAuthentication
 from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.decorators import permission_classes as permission
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser, AllowAny
-from rest_framework import generics, viewsets, permissions, status
+from rest_framework import generics, viewsets, permissions, status, mixins
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework.views import APIView
+from rest_framework.viewsets import GenericViewSet
 
-from backend.models import Question, User, Answer, Tag, Like, Profile
-from backend.permissions import IsQuestionOwner, IsProfileOwner
+from backend.models import Question, User, Answer, Tag, Like
+from backend.permissions import IsQuestionOwner, IsUserOwner
 from backend.serializers import QuestionSerializer, UserSerializer, AnswerSerializer, TagSerializer, ProfileSerializer, \
     LoginUserSerializer, CreateUserSerializer
 
 
 @api_view(['GET'])
 def api_root(request, format=None):
-    return Response({
+    data = {
         'users': rest_reverse('user-list', request=request, format=format),
         'questions': rest_reverse('question-list', request=request, format=format),
         'tags': rest_reverse('tag-list', request=request, format=format),
-        'answers': rest_reverse('answer-list', request=request, format=format),
-        'profiles': rest_reverse('profile-list', request=request, format=format),
         'register': rest_reverse('register', request=request, format=format),
         'login': rest_reverse('login', request=request, format=format),
         'logout': rest_reverse('logout', request=request, format=format),
         'debug_logout': rest_reverse('debug_logout', request=request, format=format),
-    })
+    }
+    if request.user and request.user.is_authenticated:
+        data.update({'profile': rest_reverse('user-profile', kwargs={"pk": request.user.id}, request=request, format=format)})
+    return Response(data)
 
 
 class RegistrationAPI(generics.CreateAPIView):
@@ -94,16 +96,16 @@ class QuestionViewSet(viewsets.ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-    @action(detail=True, methods=['post'], permission_classes=(IsAuthenticated,))
+    @action(detail=True, methods=['put'], permission_classes=(IsAuthenticated,))
     def set_like(self, *args, **kwargs):
         user = self.request.user
         question = self.get_object()
         count_like = Like.set_like(question, user)
-        question.author.profile.save()
+        question.author.save()
         question.save()
         return Response(
             QuestionSerializer(question, context=self.get_serializer_context()).data,
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_200_OK
         )
 
     def get_queryset(self):
@@ -116,26 +118,23 @@ class QuestionViewSet(viewsets.ModelViewSet):
         return Question.objects.all()
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserListView(generics.ListAPIView):
     serializer_class = UserSerializer
     queryset = User.objects.all()
-    permission_classes = (IsAdminUser,)
-
-
-class ProfileViewSet(viewsets.ModelViewSet):
-    serializer_class = ProfileSerializer
-    queryset = Profile.objects.all()
-    permission_classes = (IsProfileOwner|IsAdminUser,)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
 
     def get_queryset(self):
-        user_id = self.kwargs.get('user_pk')
         sort_by = self.request.GET.get('sort')
         limit = self.request.GET.get('limit')
         if sort_by and limit:
-            return Profile.objects.top_users(sort_by, int(limit))
-        if user_id:
-            return Profile.objects.filter(user_id=user_id)
-        return Profile.objects.all()
+            return User.objects.top_users(sort_by, int(limit))
+        return User.objects.all()
+
+
+class ProfileView(generics.RetrieveUpdateAPIView):
+    serializer_class = ProfileSerializer
+    queryset = User.objects.all()
+    permission_classes = (IsUserOwner|IsAdminUser,)
 
 
 class AnswerViewSet(viewsets.ModelViewSet):
@@ -153,26 +152,26 @@ class AnswerViewSet(viewsets.ModelViewSet):
         else:
             serializer.save()
 
-    @action(detail=True, methods=['post'], permission_classes=(IsAuthenticated,))
+    @action(detail=True, methods=['put'], permission_classes=(IsAuthenticated,))
     def set_like(self,  *args, **kwargs):
         user = self.request.user
         answer = self.get_object()
         count_like = Like.set_like(answer, user)
-        answer.author.profile.save()
+        answer.author.save()
         answer.save()
         return Response(
             AnswerSerializer(answer, context=self.get_serializer_context()).data,
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_200_OK
         )
 
-    @action(detail=True, methods=['post'], permission_classes=(IsQuestionOwner|IsAdminUser,))
+    @action(detail=True, methods=['put'], permission_classes=(IsQuestionOwner|IsAdminUser,))
     def mark_as_right(self,  *args, **kwargs):
         answer = self.get_object()
         mark = answer.mark_as_right()
         answer.save()
         return Response(
             AnswerSerializer(answer, context=self.get_serializer_context()).data,
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_200_OK
         )
 
     def get_queryset(self):
@@ -182,17 +181,17 @@ class AnswerViewSet(viewsets.ModelViewSet):
         return Answer.objects.all()
 
 
-class TagViewSet(viewsets.ModelViewSet):
+class TagViewSet(viewsets.GenericViewSet, mixins.ListModelMixin, mixins.RetrieveModelMixin):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
     def get_queryset(self):
-        question_pk = self.kwargs.get('question_pk')
+        # question_pk = self.kwargs.get('question_pk')
         sort_by = self.request.GET.get('sort')
         limit = self.request.GET.get('limit')
         if sort_by and limit:
             return Tag.objects.top_tags(sort_by, int(limit))
-        if question_pk:
-            return Tag.objects.filter(questions__id=question_pk)
+        # if question_pk:
+        #     return Tag.objects.filter(questions__id=question_pk)
         return Tag.objects.all()

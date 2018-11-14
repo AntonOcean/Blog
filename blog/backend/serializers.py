@@ -1,19 +1,17 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers, validators
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
 from rest_framework_nested.relations import NestedHyperlinkedRelatedField
 # from knox.serializers import UserSerializer
 
-from backend.models import Tag, Question, Answer, Profile
+from backend.models import Tag, Question, Answer, User
 
 
 class CreateUserSerializer(serializers.ModelSerializer):
-    avatar = serializers.ImageField(source='profile.avatar', required=False)
-    profile = NestedHyperlinkedRelatedField(
-        read_only=True,
-        view_name='user-profiles-detail',
-        parent_lookup_kwargs={'user_pk': 'user__pk'}
-    )
+    """
+    Регистрация
+    """
+    avatar = serializers.ImageField(required=False)
 
     def create(self, validated_data):
         user = User.objects.create_user(validated_data['username'],
@@ -23,13 +21,13 @@ class CreateUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('username', 'profile', 'email', 'password', 'avatar')
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ('username', 'email', 'password', 'avatar')
+        extra_kwargs = {'password': {'write_only': True,}}
 
 
 class LoginUserSerializer(serializers.Serializer): # DEBUG feature
     username = serializers.CharField()
-    password = serializers.CharField()
+    password = serializers.CharField(style={'input_type': 'password'})
 
     def validate(self, data):
         user = authenticate(**data)
@@ -60,20 +58,19 @@ class QuestionSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
-    avatar = serializers.ImageField(source='profile.avatar')
-    profile = NestedHyperlinkedRelatedField(
-        read_only=True,
-        view_name='user-profiles-detail',
-        parent_lookup_kwargs={'user_pk': 'user__pk'}
-    )
+    """
+    Лист пользователей
+    """
 
     class Meta:
         model = User
-        fields = ('url', 'username', 'profile', 'email', 'password', 'avatar')
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ('username', 'rating')
 
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
+    """
+    Вопросы по тегу, лист тегов
+    """
     questions = serializers.HyperlinkedIdentityField(
         view_name='tag-questions-list',
         lookup_url_kwarg='tag_pk',
@@ -101,14 +98,11 @@ class AnswerSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class ProfileSerializer(serializers.HyperlinkedModelSerializer):
+    """
+    Профиль пользователя
+    """
     rating = serializers.IntegerField(read_only=True)
-    username = serializers.CharField(source='user.username')
-    email = serializers.EmailField(source='user.email')
-    user = serializers.HyperlinkedRelatedField(
-        read_only=True,
-        view_name='user-detail',
-    )
 
     class Meta:
-        model = Profile
-        fields = ('url', 'avatar', 'rating', 'user', 'username', 'email')
+        model = User
+        fields = ('avatar', 'rating', 'username', 'email')
