@@ -79,7 +79,6 @@ class QuestionViewSet(viewsets.ModelViewSet):
     serializer_class = QuestionSerializer
     pagination_class = CursorPagination
 
-
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
@@ -107,12 +106,13 @@ class QuestionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         sort_by = self.request.GET.get('sort')
+        queryset = super().get_queryset()
         if sort_by:
-            return Question.objects.hot_questions(sort_by)
+            return queryset.hot_questions(sort_by)
         tag_pk = self.kwargs.get('tag_pk')
         if tag_pk:
-            return Question.objects.filter(tags__id=tag_pk)
-        return super().get_queryset()
+            return queryset.filter(tags__id=tag_pk)
+        return queryset
 
 
 class UserListView(generics.ListAPIView):
@@ -122,10 +122,11 @@ class UserListView(generics.ListAPIView):
 
     def get_queryset(self):
         sort_by = self.request.GET.get('sort')
+        queryset = super().get_queryset()
         limit = self.request.GET.get('limit')
         if sort_by and limit:
             return User.objects.top_users(sort_by, int(limit))
-        return User.objects.all()
+        return queryset
 
 
 class ProfileView(generics.RetrieveUpdateAPIView):
@@ -135,7 +136,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
 
 class AnswerViewSet(viewsets.ModelViewSet):
-    queryset = Answer.objects.all()
+    queryset = Answer.objects.prefetch_related('author')
     serializer_class = AnswerSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
@@ -165,9 +166,10 @@ class AnswerViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         question_id = self.kwargs.get('question_pk')
+        queryset = super().get_queryset()
         if question_id:
-            return Answer.objects.filter(question_id=question_id)
-        return Answer.objects.all()
+            return queryset.filter(question_id=question_id)
+        return queryset
 
 
 class TagViewSet(viewsets.GenericViewSet, mixins.ListModelMixin, mixins.RetrieveModelMixin):
@@ -178,6 +180,7 @@ class TagViewSet(viewsets.GenericViewSet, mixins.ListModelMixin, mixins.Retrieve
     def get_queryset(self):
         sort_by = self.request.GET.get('sort')
         limit = self.request.GET.get('limit')
+        queryset = super().get_queryset()
         if sort_by and limit:
-            return Tag.objects.top_tags(sort_by, int(limit))
-        return Tag.objects.all()
+            return queryset.top_tags(sort_by, int(limit))
+        return queryset

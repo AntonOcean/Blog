@@ -257,6 +257,14 @@ class TestQuestion(BaseViewTest):
         self.assertEqual(self.bob_username, response.data['author'])
         self.assertEqual(self.question.pk, int(response.data['question'].split('/')[-2]))
 
+    def test_sort(self):
+        url = reverse('question-list')
+        response = self.client.get(
+            url,
+            data={"sort": "rating"},
+        )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
 
 class TestAnswer(BaseViewTest):
     def create_answer(self):
