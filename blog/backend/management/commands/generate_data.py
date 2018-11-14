@@ -1,107 +1,107 @@
-from django.core.management.base import  BaseCommand
-from datetime import datetime
+from django.core.management.base import BaseCommand
 from faker import Faker
 import random
 from backend.models import Question, Tag, Like, User, Answer
-from types import FunctionType
-from functools import wraps
+
 
 USER_COUNT = 10000
 TAG_COUNT = 10000
 QUESTION_COUNT = 100000
 ANSWER_COUNT = 1000000
-VOTE_COUNT = 2000000
+LIKE_COUNT = 2000000
 
 
 class Command(BaseCommand):
+    faker = Faker()
+
     def handle(self, *args, **options):
-        self.create_users()
-        users = User.objects.all()
+        users = self.create_users()
+        print("Шаг 1 из 7 Пользователи созданы")
 
-        self.create_tags()
-        tags = Tag.objects.all()
+        tags = self.create_tags()
+        print("Шаг 2 из 7 Теги созданы")
 
-        self.create_questions(users=users, tags=tags)
-        questions = Question.objects.all()
+        questions = self.create_questions(users=users, tags=tags)
+        print("Шаг 3 из 7 Вопросы созданы")
 
-        self.create_answers(users=users, questions=questions)
-        answers = Answer.objects.all()
+        answers = self.create_answers(users=users, questions=questions)
+        print("Шаг 4 из 7 Ответы созданы")
+
+        self.update_answer_count(questions=questions)
+        print("Шаг 5 из 7 Обновлен счетчик ответов у вопросов")
+
+        self.update_tag_rating(tags)
+        print("Шаг 6 из 7 Обновлен рейтинг тегов")
 
         self.create_likes(users=users, answers=answers, questions=questions)
+        print("Шаг 7 из 7 Лайки созданы")
 
     def create_users(self):
         users = []
-        faker = Faker()
         for i in range(USER_COUNT):
-            user = User(username=faker.user_name()+str(i), password='passwd{}'.format(i), email=faker.email())
+            user = User(username=self.faker.user_name()+str(i), password='passwd{}'.format(i), email=self.faker.email())
             users.append(user)
-
-        User.objects.bulk_create(users, batch_size=10000)
+        return User.objects.bulk_create(users, batch_size=10000)
 
     def create_tags(self):
         tags = []
-        faker = Faker()
         for i in range(TAG_COUNT):
-            tag = Tag(name=faker.word()+str(i))
+            tag = Tag(name=self.faker.word()+str(i))
             tags.append(tag)
+        return Tag.objects.bulk_create(tags, batch_size=10000)
 
-        Tag.objects.bulk_create(tags, batch_size=10000)
-
-
+    def create_questions(self, users, tags):
+        questions = []
+        for _ in range(QUESTION_COUNT):
+            question = Question(
+                title=self.faker.sentence()[:random.randint(20, 100)],
+                long_text=self.faker.text(),
+                author=random.choice(users),
+            )
+            question.tags.add(*[random.choice(tags) for _ in range(random.randint(0, 10))])
+            questions.append(question)
+        return Question.objects.bulk_create(questions, batch_size=100)
 
     def create_answers(self, users, questions):
         answers = []
-        faker = Faker()
         for _ in range(ANSWER_COUNT):
-            answer = Answer(author=random.choice(users), question=random.choice(questions), text=faker.text())
+            answer = Answer(author=random.choice(users), question=random.choice(questions), text=self.faker.text())
             answers.append(answer)
+        return Answer.objects.bulk_create(answers, batch_size=10000)
 
-        Answer.objects.bulk_create(answers, batch_size=10000)
-
-    def count_answer_count(self, questions):
+    def update_answer_count(self, questions):
         for question in questions:
-            question.answer_count = question.answer_set.count()
-        Question.bulk_objects.bulk_update(questions, update_fields=['answer_count'], batch_size=10000)
+            question.count_answers = question.answers.count()
+        Question.objects.bulk_update(questions, update_fields=['count_answers'], batch_size=10000)
 
+    def update_tag_rating(self, tags):
+        for tag in tags:
+            tag.rating = tag.questions.count()
+        Question.objects.bulk_update(tags, update_fields=['rating'], batch_size=10000)
 
-    def generate_likes_fast(self, users):
-        # Генерация за 41ю6 минут!!!
-        Like.objects.all().delete()
+    def create_likes(self, users, answers, questions):
+        big_data = list(answers) + list(questions)
+        author_list = []
+        answer_list = []
+        question_list = []
+        for _ in range(LIKE_COUNT):
+            obj = random.choice(big_data)
+            obj_author = obj.author
+            like_add = Like.set_like(obj=obj, user=random.choice(users))
+            if like_add:
+                obj.rating += 1
+                obj_author.rating += 1
+            else:
+                obj.rating -= 1
+                obj_author.rating -= 1
+            if obj._meta.model == Question:
+                question_list.append(obj)
+            else:
+                answer_list.append(obj)
+            author_list.append(obj_author)
 
-        questions = Question.objects.filter(pk__lte=10000)
-        answers = Answer.objects.filter(pk__lte=10000)
+        print("Шаг 6.5 из 7 Лайки проставлены")
 
-        i = 1
-
-        while(Like.objects.all().count() < 2000000):
-            user = users[i]
-            i += 1
-            list_of_likes = []
-
-            _questions = questions.exclude(author=user)
-            for question in _questions:
-                value = random.choice([1, -1])
-                like = Like.set_like(user=user, obj=question)
-                list_of_likes.append(like)
-
-            _answers = answers.exclude(author=user)
-            for answer in _answers:
-                value = random.choice([1, -1])
-                like = LikeDislike(vote=value, user=user, content_object=answer)
-                list_of_likes.append(like)
-
-            LikeDislike.objects.bulk_create(list_of_likes)
-            for like in list_of_likes:
-                like.content_object.rate += like.vote
-                like.content_object.save(update_fields=['rate'])
-
-    # def add_tag_question_relations(self, questions, tags):
-    #     for question in questions:
-    #         tags_for_questions = []
-    #         for _ in range(random.randint(1, 5)):
-    #             tag = random.choice(tags)
-    #             if tag.pk not in tags_for_questions:
-    #                 tags_for_questions.append(tag.pk)
-    #         question.tags.add(*tags_for_questions)
-    #
-    #     Question.bulk_objects.bulk_update(questions, update_fields=['tags'], batch_size=10000)
+        Question.objects.bulk_update(question_list, update_fields=['rating'], batch_size=10000)
+        Answer.objects.bulk_update(answer_list, update_fields=['rating'], batch_size=10000)
+        User.objects.bulk_update(author_list, update_fields=['rating'], batch_size=10000)

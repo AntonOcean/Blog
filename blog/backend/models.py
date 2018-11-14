@@ -44,6 +44,8 @@ class Like(models.Model):
             content_type=obj_type, object_id=obj.id, user=user)
         if not is_created:
             like.delete()
+            return False
+        return True
 
 
 class Question(models.Model):
