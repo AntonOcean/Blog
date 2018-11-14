@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django_bulk_update.helper import bulk_update
 from faker import Faker
 import random
 from backend.models import Question, Tag, Like, User, Answer
@@ -71,30 +72,30 @@ class Command(BaseCommand):
 
     def add_tag_question_relations(self, questions, tags):
         for question in questions:
-            tag_list = [random.choice(tags) for _ in range(random.randint(1, 10))]
+            tag_list = [random.choice(tags) for _ in range(random.randint(1, 6))]
             tag_id_list = []
             for tag in tag_list:
                 if tag.pk not in tag_id_list:
                     tag_id_list.append(tag.pk)
             question.tags.add(*tag_id_list)
-            question.save()
+        bulk_update(questions, batch_size=100)
 
     def create_answers(self, users, questions):
         answers = []
         for _ in range(ANSWER_COUNT):
             answer = Answer(author=random.choice(users), question=random.choice(questions), text=self.faker.text())
             answers.append(answer)
-        return Answer.objects.bulk_create(answers, batch_size=100)
+        Answer.objects.bulk_create(answers, batch_size=100)
 
     def update_answer_count(self, questions):
         for question in questions:
             question.count_answers = question.answers.count()
-            question.save()
+        bulk_update(questions, update_fields=['count_answers'], batch_size=100)
 
     def update_tag_rating(self, tags):
         for tag in tags:
             tag.rating = tag.questions.count()
-            tag.save()
+        bulk_update(tags, update_fields=['rating'], batch_size=100)
 
     def create_likes(self, users, answers, questions):
         big_data = list(answers) + list(questions)
@@ -116,5 +117,6 @@ class Command(BaseCommand):
             else:
                 answer_list.append(obj)
             author_list.append(obj_author)
-            obj.save()
-            obj_author.save()
+        bulk_update(question_list, update_fields=['rating'], batch_size=100)
+        bulk_update(answer_list, update_fields=['rating'], batch_size=100)
+        bulk_update(author_list, update_fields=['rating'], batch_size=100)
