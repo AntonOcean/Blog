@@ -11,6 +11,8 @@ QUESTION_COUNT = 100000
 ANSWER_COUNT = 1000000
 LIKE_COUNT = 2000000
 
+BATCH_SIZE = 500
+
 
 class Command(BaseCommand):
     faker = Faker()
@@ -28,8 +30,8 @@ class Command(BaseCommand):
         questions = Question.objects.all()
         print("Шаг 3 из 8 Вопросы созданы")
 
-        self.add_tag_question_relations(questions=questions, tags=tags)
-        print("Шаг 4 из 8 Добавлены теги")
+        # self.add_tag_question_relations(questions=questions, tags=tags)
+        # print("Шаг 4 из 8 Добавлены теги")
 
         self.create_answers(users=users, questions=questions)
         answers = Answer.objects.all()
@@ -44,19 +46,22 @@ class Command(BaseCommand):
         self.create_likes(users=users, answers=answers, questions=questions)
         print("Шаг 8 из 8 Лайки созданы")
 
+        self.add_tag_question_relations(questions=questions, tags=tags)
+        print("Шаг 4 из 8 Добавлены теги")
+
     def create_users(self):
         users = []
         for i in range(USER_COUNT):
             user = User(username=self.faker.user_name()+str(i), password='passwd{}'.format(i), email=self.faker.email())
             users.append(user)
-        User.objects.bulk_create(users, batch_size=100)
+        User.objects.bulk_create(users, batch_size=BATCH_SIZE)
 
     def create_tags(self):
         tags = []
         for i in range(TAG_COUNT):
             tag = Tag(name=self.faker.word()+str(i))
             tags.append(tag)
-        Tag.objects.bulk_create(tags, batch_size=100)
+        Tag.objects.bulk_create(tags, batch_size=BATCH_SIZE)
 
     def create_questions(self, users):
         questions = []
@@ -68,7 +73,7 @@ class Command(BaseCommand):
                 author_id=author.id,
             )
             questions.append(question)
-        Question.objects.bulk_create(questions, batch_size=100)
+        Question.objects.bulk_create(questions, batch_size=BATCH_SIZE)
 
     def add_tag_question_relations(self, questions, tags):
         for question in questions:
@@ -78,24 +83,24 @@ class Command(BaseCommand):
                 if tag.pk not in tag_id_list:
                     tag_id_list.append(tag.pk)
             question.tags.add(*tag_id_list)
-        bulk_update(questions, batch_size=100)
+        bulk_update(questions, batch_size=BATCH_SIZE)
 
     def create_answers(self, users, questions):
         answers = []
         for _ in range(ANSWER_COUNT):
             answer = Answer(author=random.choice(users), question=random.choice(questions), text=self.faker.text())
             answers.append(answer)
-        Answer.objects.bulk_create(answers, batch_size=100)
+        Answer.objects.bulk_create(answers, batch_size=BATCH_SIZE)
 
     def update_answer_count(self, questions):
         for question in questions:
             question.count_answers = question.answers.count()
-        bulk_update(questions, update_fields=['count_answers'], batch_size=100)
+        bulk_update(questions, update_fields=['count_answers'], batch_size=BATCH_SIZE)
 
     def update_tag_rating(self, tags):
         for tag in tags:
             tag.rating = tag.questions.count()
-        bulk_update(tags, update_fields=['rating'], batch_size=100)
+        bulk_update(tags, update_fields=['rating'], batch_size=BATCH_SIZE)
 
     def create_likes(self, users, answers, questions):
         big_data = list(answers) + list(questions)
@@ -117,6 +122,6 @@ class Command(BaseCommand):
             else:
                 answer_list.append(obj)
             author_list.append(obj_author)
-        bulk_update(question_list, update_fields=['rating'], batch_size=100)
-        bulk_update(answer_list, update_fields=['rating'], batch_size=100)
-        bulk_update(author_list, update_fields=['rating'], batch_size=100)
+        bulk_update(question_list, update_fields=['rating'], batch_size=BATCH_SIZE)
+        bulk_update(answer_list, update_fields=['rating'], batch_size=BATCH_SIZE)
+        bulk_update(author_list, update_fields=['rating'], batch_size=BATCH_SIZE)

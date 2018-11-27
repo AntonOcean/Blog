@@ -26,6 +26,8 @@ class QuestionAdmin(admin.ModelAdmin):
 
     inlines = [AnswerInline]
 
+    filter_horizontal = ('tags',)
+
 
 class QuestionInline(admin.TabularInline):
     model = Question.tags.through

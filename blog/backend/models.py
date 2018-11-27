@@ -35,7 +35,7 @@ class Like(models.Model):
     user = models.ForeignKey(User, related_name='likes', on_delete=models.CASCADE)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey('content_type', 'object_id')
+    content_object = GenericForeignKey('content_type', 'object_id') #
 
     @staticmethod
     def set_like(obj, user):
@@ -46,6 +46,8 @@ class Like(models.Model):
             like.delete()
             return False
         return True
+
+    # Дополнить content_object, content_type -- unique
 
 
 class Question(models.Model):
